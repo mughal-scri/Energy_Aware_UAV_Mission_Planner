@@ -1,0 +1,7 @@
+# Runtime (verified 2026-10-20, Python 3.12.3)
+numpy==2.5.4
+matplotlib==3.11.2
+
+# Development
+pytest==9.1.1
+jupyter>=1.0

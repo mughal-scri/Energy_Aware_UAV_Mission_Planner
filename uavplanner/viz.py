@@ -1,4 +1,4 @@
-"""Plots for Phase 1. Colours and sizes live in ``STYLE``; do not hard-code them."""
+"""PLOTS: Colours and sizes live in ``STYLE``"""
 
 from __future__ import annotations
 
@@ -351,7 +351,7 @@ def fig_search_explored(
 
 
 def write_figures(out_dir: str | Path = "results") -> tuple[Path, Path]:
-    """Build a default scenario and write the two Phase 1 figures."""
+    """Build a default scenario and write the figures."""
     from numpy.random import default_rng
 
     from uavplanner.config import Config
@@ -452,7 +452,7 @@ def fig_search_compare(
 def write_figures2(
     out_dir: str | Path = "results", n_pairs: int = 30
 ) -> tuple[Path, Path, Path]:
-    """Build the reproducible Phase 2 exploration and comparison figures."""
+    """Build the reproducible exploration and comparison figures."""
     from numpy.random import default_rng
 
     from uavplanner.informed import astar, greedy

@@ -62,6 +62,7 @@ class Config:
     ga_pm: float = 0.1
     ga_tournament: int = 3
     ga_elite: int = 2
+    ga_battery_penalty: float = 1000.0
     minimax_depth: int = 4
     minimax_window_r: int = 4
     minimax_trigger: int = 5

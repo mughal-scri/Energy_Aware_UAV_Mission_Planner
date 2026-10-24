@@ -1,4 +1,4 @@
-"""Phase 1 search checks from Design_Doc.md Sections 6.2 and 6.3."""
+"""Test Search Algorithms on the world with config"""
 
 import math
 

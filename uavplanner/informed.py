@@ -26,7 +26,7 @@ def greedy(
     floor: float | None = None,
     diag_step: float | None = None,
     ) -> SearchResult: 
-    """greedy best-first search orderd by Euclidean distance to the goal."""
+    """Greedy best-first search ordered by Euclidean distance to the goal."""
     if floor is None: 
         floor = Config.energy_floor
     if diag_step is None: 

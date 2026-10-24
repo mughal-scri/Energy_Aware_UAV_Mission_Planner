@@ -38,7 +38,7 @@ def test_config_defaults() -> None:
     assert cfg.interceptor_speed == 1
     assert cfg.hc_restarts == 20
     assert (cfg.ga_pop, cfg.ga_gens, cfg.ga_pc, cfg.ga_pm) == (50, 100, 0.8, 0.1)
-    assert (cfg.ga_tournament, cfg.ga_elite) == (3, 2)
+    assert (cfg.ga_tournament, cfg.ga_elite, cfg.ga_battery_penalty) == (3, 2, 1000.0)
     assert (cfg.minimax_depth, cfg.minimax_window_r) == (4, 4)
     assert (cfg.minimax_trigger, cfg.minimax_release) == (5, 8)
     assert (cfg.minimax_w_goal, cfg.minimax_w_threat, cfg.minimax_cap) == (1.0, 1.5, 5,)

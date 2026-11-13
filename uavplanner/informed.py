@@ -1,23 +1,25 @@
-"""Informed Search: Greedy best-first, energy-aware A*, and leg costs."""
+"""Informed search: Greedy best-first, energy-aware A*, and leg costs."""
 
 from __future__ import annotations
 
 import heapq
 import math
 
-import numpy as np 
+import numpy as np
 
 from uavplanner.config import Config
 from uavplanner.energy import e_min, headwind, move_energy, path_energy
 from uavplanner.models import Cell, EnergyCoef, SearchResult, World
 from uavplanner.world import neighbors, reconstruct_path
 
-def euclid(a: Cell, b: Cell) -> float: 
-    """Straight distance in cells"""
+
+def euclid(a: Cell, b: Cell) -> float:
+    """Straight-line distance in cells."""
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
+
 def greedy(
-    world: World, 
+    world: World,
     blocked: np.ndarray,
     start: Cell,
     goal: Cell,
@@ -25,40 +27,41 @@ def greedy(
     payload: float,
     floor: float | None = None,
     diag_step: float | None = None,
-    ) -> SearchResult: 
+) -> SearchResult:
     """Greedy best-first search ordered by Euclidean distance to the goal."""
-    if floor is None: 
+    if floor is None:
         floor = Config.energy_floor
-    if diag_step is None: 
+    if diag_step is None:
         diag_step = Config.diag_step
-    if start == goal: 
+    if start == goal:
         return SearchResult(path=[], cost=0.0, expanded=1, explored=[start])
     n = int(blocked.shape[0])
-    if blocked[start] or blocked[goal]: 
+    if blocked[start] or blocked[goal]:
         return SearchResult(path=[], cost=math.inf, expanded=0, explored=[])
-    
+
     heap: list[tuple[float, int, Cell]] = [(euclid(start, goal), 0, start)]
     parent: dict[Cell, Cell | None] = {start: None}
     explored: list[Cell] = []
     tie = 1
     found = False
-    while heap: 
+    while heap:
         _h, _t, cell = heapq.heappop(heap)
         explored.append(cell)
-        if cell == goal: 
+        if cell == goal:
             found = True
-            break 
+            break
         for nb, _length in neighbors(cell, n, diag_step=diag_step):
-            if blocked[nb] or nb in parent: 
+            if blocked[nb] or nb in parent:
                 continue
             parent[nb] = cell
             heapq.heappush(heap, (euclid(nb, goal), tie, nb))
             tie += 1
-    if not found: 
+    if not found:
         return SearchResult(path=[], cost=math.inf, expanded=len(explored), explored=explored)
     path = reconstruct_path(parent, goal)
     cost = path_energy(world, path, coef, payload, floor=floor, diag_step=diag_step)
     return SearchResult(path=path, cost=cost, expanded=len(explored), explored=explored)
+
 
 def astar(
     world: World,
@@ -121,6 +124,7 @@ def astar(
             tie += 1
     return SearchResult(path=[], cost=math.inf, expanded=len(explored), explored=explored)
 
+
 def cost_matrix(
     world: World,
     blocked: np.ndarray,
@@ -130,20 +134,20 @@ def cost_matrix(
     max_wind: float,
 ) -> tuple[np.ndarray, dict[tuple[int, int], list[Cell]]]:
     """Return directed A* energy costs and paths between every pair of stops.
-    
-    The matrix includes diagonal entries of zeros. For an unreachable directed
+
+    The matrix includes diagonal entries of zero. For an unreachable directed
     leg, the corresponding matrix entry is ``np.inf`` and its path is empty.
     """
     count = len(stops)
     matrix = np.full((count, count), np.inf, dtype=float)
     paths: dict[tuple[int, int], list[Cell]] = {}
     for i, start in enumerate(stops):
-        matrix[i,i] = 0.0
-        paths[(i,i)] = []
-        for j, goal in enumerate(stops): 
-            if i == j: 
+        matrix[i, i] = 0.0
+        paths[(i, i)] = []
+        for j, goal in enumerate(stops):
+            if i == j:
                 continue
             result = astar(world, blocked, start, goal, coef, payload, max_wind)
-            matrix[i,j] = result.cost 
-            paths[(i,j)] = result.path
-    return matrix, paths    
+            matrix[i, j] = result.cost
+            paths[(i, j)] = result.path
+    return matrix, paths

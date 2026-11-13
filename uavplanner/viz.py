@@ -1,4 +1,4 @@
-"""PLOTS: Colours and sizes live in ``STYLE``"""
+"""Plots ---- Colours and sizes live in ``STYLE``; do not hard-code them."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ STYLE = {
     "figsize_world": (8.4, 7.2),
     "figsize_search": (10.5, 9.2),
     "figsize_compare": (10.0, 4.8),
+    "figsize_ordering": (10.5, 5.0),
     "dpi": 130,
     "font_size": 11,
     "title_size": 12,
@@ -56,6 +57,11 @@ STYLE = {
     "title_pad": 8,
     "search_colors": ["#0072b2", "#009e73", "#d55e00", "#cc79a7"],
     "bar_edge": "#333333",
+    "random_color": "#7f7f7f",
+    "hc_color": "#009e73",
+    "ga_color": "#cc79a7",
+    "base_route_color": "#0072b2",
+    "route_linewidth": 1.6,
 }
 
 
@@ -350,8 +356,8 @@ def fig_search_explored(
     plt.close(fig)
 
 
-def write_figures(out_dir: str | Path = "results") -> tuple[Path, Path]:
-    """Build a default scenario and write the figures."""
+def write_figures_1(out_dir: str | Path = "results") -> tuple[Path, Path]:
+    """Build a default scenario and write the two figures."""
     from numpy.random import default_rng
 
     from uavplanner.config import Config
@@ -449,7 +455,7 @@ def fig_search_compare(
     plt.close(fig)
 
 
-def write_figures2(
+def write_figures_2(
     out_dir: str | Path = "results", n_pairs: int = 30
 ) -> tuple[Path, Path, Path]:
     """Build the reproducible exploration and comparison figures."""
@@ -497,3 +503,198 @@ def write_figures2(
     fig_search_explored(blocked, panels, explored_path)
     fig_search_compare(metrics, comparison_path)
     return world_path, explored_path, comparison_path
+
+
+def synthetic_ordering_matrix(
+    n_stops: int, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """Create a reproducible directed synthetic matrix for ordering experiments.
+
+    It supplies the 12--20 stops needed for scaling, which exceed a generated
+    world scenario's usual six to eight targets. The direction multiplier
+    models a steady wind, so costs remain asymmetric like the A* matrix.
+    """
+    if n_stops < 1:
+        raise ValueError("n_stops must be positive")
+    points = rng.uniform(0.0, 1.0, size=(n_stops + 1, 2))
+    wind = rng.normal(size=2)
+    wind /= np.linalg.norm(wind)
+    matrix = np.zeros((n_stops + 1, n_stops + 1), dtype=float)
+    for start in range(n_stops + 1):
+        for goal in range(n_stops + 1):
+            if start == goal:
+                continue
+            delta = points[goal] - points[start]
+            distance = float(np.linalg.norm(delta))
+            direction = delta / distance
+            matrix[start, goal] = distance * (1.0 + 0.20 * float(np.dot(direction, wind)))
+    return matrix, points
+
+
+def ordering_scaling_experiment(
+    sizes: tuple[int, ...] = (12, 16, 20), seed: int = Config.seed
+) -> list[dict[str, float]]:
+    """Compare random, Hill Climbing, and GA tours at practical problem sizes."""
+    from uavplanner.genetic import genetic_order
+    from uavplanner.hill_climbing import hill_climb, tour_cost
+
+    if not sizes or any(size < 2 for size in sizes):
+        raise ValueError("sizes must contain values of at least 2")
+    rng = np.random.default_rng(seed)
+    rows: list[dict[str, float]] = []
+    for size in sizes:
+        matrix, _points = synthetic_ordering_matrix(size, rng)
+        stops = list(range(1, size + 1))
+        random_order = list(rng.permutation(stops))
+        _hc_order, hc_cost, _hc_history = hill_climb(
+            matrix, stops, restarts=Config.hc_restarts, rng=rng
+        )
+        _ga_order, ga_cost, _ga_history = genetic_order(
+            matrix,
+            stops,
+            pop=Config.ga_pop,
+            gens=Config.ga_gens,
+            pc=Config.ga_pc,
+            pm=Config.ga_pm,
+            tournament=Config.ga_tournament,
+            elite=Config.ga_elite,
+            rng=rng,
+        )
+        rows.append(
+            {
+                "stops": float(size),
+                "random": tour_cost(random_order, matrix),
+                "hill_climb": hc_cost,
+                "genetic": ga_cost,
+            }
+        )
+    return rows
+
+
+def _plot_tour(ax, points: np.ndarray, order: list[int], title: str, color: str) -> None:
+    """Plot a base-returning synthetic tour without relying on colour alone."""
+    route = [0, *order, 0]
+    ax.plot(
+        points[route, 0],
+        points[route, 1],
+        color=color,
+        linewidth=STYLE["route_linewidth"],
+        marker="o",
+        markersize=3.5,
+    )
+    ax.scatter(
+        points[0, 0], points[0, 1], marker="s", s=STYLE["base_size"],
+        color=STYLE["base_route_color"], edgecolors=STYLE["marker_edge"], label="Base", zorder=3
+    )
+    ax.scatter(
+        points[1:, 0], points[1:, 1], marker=STYLE["target_marker"], s=STYLE["target_size"],
+        color=STYLE["target_color"], edgecolors=STYLE["marker_edge"], label="Stop", zorder=3
+    )
+    ax.set_title(title, pad=STYLE["title_pad"])
+    ax.set_xlabel("synthetic east-west position")
+    ax.set_ylabel("synthetic north-south position")
+    ax.set_aspect("equal")
+
+
+def fig_tour_hc_ga(
+    points: np.ndarray,
+    hc_order: list[int],
+    hc_cost: float,
+    ga_order: list[int],
+    ga_cost: float,
+    path: str | Path,
+) -> None:
+    """Save side-by-side synthetic tours returned by Hill Climbing and GA."""
+    _apply_style()
+    fig, axes = plt.subplots(1, 2, figsize=STYLE["figsize_ordering"])
+    _plot_tour(axes[0], points, hc_order, f"Hill Climbing\ncost={hc_cost:.2f}", STYLE["hc_color"])
+    _plot_tour(axes[1], points, ga_order, f"Genetic Algorithm\ncost={ga_cost:.2f}", STYLE["ga_color"])
+    axes[1].legend(loc="best", fontsize=STYLE["legend_fontsize"])
+    fig.suptitle("Directed tour order on a synthetic 12-stop instance", y=1.02)
+    fig.tight_layout()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=STYLE["dpi"], bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_convergence(hc_history: list[float], ga_history: list[float], path: str | Path) -> None:
+    """Save the best-cost histories for the two ordering methods."""
+    _apply_style()
+    fig, ax = plt.subplots(figsize=STYLE["figsize_ordering"])
+    ax.plot(hc_history, color=STYLE["hc_color"], label="Hill Climbing", linewidth=2.0)
+    ax.plot(ga_history, color=STYLE["ga_color"], label="Genetic Algorithm", linewidth=2.0)
+    ax.set_title("Best tour cost during optimization", pad=STYLE["title_pad"])
+    ax.set_xlabel("improvement step / generation")
+    ax.set_ylabel("tour energy (synthetic units)")
+    ax.grid(alpha=0.25)
+    ax.legend(fontsize=STYLE["legend_fontsize"])
+    fig.tight_layout()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=STYLE["dpi"], bbox_inches="tight")
+    plt.close(fig)
+
+
+def fig_ordering_scaling(rows: list[dict[str, float]], path: str | Path) -> None:
+    """Save random, Hill Climbing, and GA costs for 12--20 stop instances."""
+    _apply_style()
+    labels = [str(int(row["stops"])) for row in rows]
+    locations = np.arange(len(rows))
+    width = 0.24
+    fig, ax = plt.subplots(figsize=STYLE["figsize_ordering"])
+    for offset, key, label, color in (
+        (-width, "random", "Random", STYLE["random_color"]),
+        (0.0, "hill_climb", "Hill Climbing", STYLE["hc_color"]),
+        (width, "genetic", "Genetic Algorithm", STYLE["ga_color"]),
+    ):
+        ax.bar(
+            locations + offset,
+            [row[key] for row in rows],
+            width,
+            label=label,
+            color=color,
+            edgecolor=STYLE["bar_edge"],
+        )
+    ax.set_title("Ordering cost as stop count grows", pad=STYLE["title_pad"])
+    ax.set_xlabel("number of stops")
+    ax.set_ylabel("tour energy (synthetic units)")
+    ax.set_xticks(locations, labels)
+    ax.grid(axis="y", alpha=0.25)
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=STYLE["legend_fontsize"])
+    fig.tight_layout()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=STYLE["dpi"], bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_figures_3(out_dir: str | Path = "results") -> tuple[Path, Path, Path]:
+    """Generate all reproducible ordering figures from the default seed."""
+    from uavplanner.genetic import genetic_order
+    from uavplanner.hill_climbing import hill_climb
+
+    rng = np.random.default_rng(Config.seed)
+    matrix, points = synthetic_ordering_matrix(12, rng)
+    stops = list(range(1, 13))
+    hc_order, hc_cost, hc_history = hill_climb(
+        matrix, stops, restarts=Config.hc_restarts, rng=rng
+    )
+    ga_order, ga_cost, ga_history = genetic_order(
+        matrix,
+        stops,
+        pop=Config.ga_pop,
+        gens=Config.ga_gens,
+        pc=Config.ga_pc,
+        pm=Config.ga_pm,
+        tournament=Config.ga_tournament,
+        elite=Config.ga_elite,
+        rng=rng,
+    )
+    rows = ordering_scaling_experiment()
+    out = Path(out_dir)
+    tour_path = out / "fig_tour_hc_ga.png"
+    convergence_path = out / "fig_convergence.png"
+    scaling_path = out / "fig_ordering_scaling.png"
+    fig_tour_hc_ga(points, hc_order, hc_cost, ga_order, ga_cost, tour_path)
+    fig_convergence(hc_history, ga_history, convergence_path)
+    fig_ordering_scaling(rows, scaling_path)
+    return tour_path, convergence_path, scaling_path

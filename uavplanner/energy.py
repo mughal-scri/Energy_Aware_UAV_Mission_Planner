@@ -18,7 +18,7 @@ def headwind(wind: tuple[float, float], step: tuple[int, int]) -> float:
 
 def move_energy(coef: EnergyCoef, d: float, climb: float, headwind: float, payload: float, floor: float = 0.3,) -> float:
     """Predicted energy (EU) for one step, floored at ``floor * d``."""
-    raw = ( coef.a * d + coef.b * max(0.0, climb)+ coef.c * d * headwind + coef.e * payload * d)
+    raw = (coef.a * d + coef.b * max(0.0, climb) + coef.c * d * headwind + coef.e * payload * d )
     return max(raw, floor * d)
 
 def e_min(coef: EnergyCoef, max_wind: float, floor: float = 0.3) -> float:
@@ -46,10 +46,17 @@ def init_estimate( true_coef: EnergyCoef, rng: np.random.Generator, spread: floa
     def _jitter(value: float) -> float:
         factor = 1.0 + float(rng.uniform(-spread, spread))
         return max(1e-6, value * factor)
-    return EnergyCoef(a=_jitter(true_coef.a), b=_jitter(true_coef.b), c=_jitter(true_coef.c), e=_jitter(true_coef.e),)
+    return EnergyCoef(a=_jitter(true_coef.a), b=_jitter(true_coef.b), c=_jitter(true_coef.c),e=_jitter(true_coef.e),)
 
 
-def path_energy(world: World, path: list[Cell], coef: EnergyCoef, payload: float, floor: float = 0.3, diag_step: float = 1.414,) -> float:
+def path_energy(
+    world: World,
+    path: list[Cell],
+    coef: EnergyCoef,
+    payload: float,
+    floor: float = 0.3,
+    diag_step: float = 1.414,
+) -> float:
     """Sum ``move_energy`` along a cell path. An empty or single-cell path costs 0."""
     if len(path) < 2:
         return 0.0

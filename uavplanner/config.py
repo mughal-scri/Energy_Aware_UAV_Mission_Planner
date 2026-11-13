@@ -1,7 +1,7 @@
 """All tunable parameters in one dataclass.
 
 Later modules must read values from ``Config`` instead of hard-coding them.
-Defaults match Design_Doc.md Section 7 (and the world-generation ranges in
+Defaults match (and the world-generation ranges in
 Section 6.1, so ``world.py`` will not introduce magic numbers).
 """
 

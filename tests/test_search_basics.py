@@ -1,4 +1,4 @@
-"""Test Search Algorithms on the world with config"""
+"""Search checks for basic algorithms"""
 
 import math
 
@@ -56,7 +56,8 @@ def test_ucs_and_greedy_find_a_path() -> None:
     assert astar_res.path[0] == world.base and astar_res.path[-1] == goal
     assert greedy_res.cost >= ucs_res.cost - 1e-9
     assert greedy_res.cost >= astar_res.cost - 1e-9
-    
+
+
 def test_astar_matches_ucs_and_expands_no_more_on_thirty_pairs() -> None:
     cfg = Config(seed=19)
     rng = np.random.default_rng(cfg.seed)
@@ -86,6 +87,7 @@ def test_astar_heuristic_is_not_above_ucs_remaining_cost() -> None:
         goal = free[int(goal_index)]
         remaining_cost = ucs(world, world.no_fly, start, goal, coef, 1.0).cost
         assert lower_per_cell * euclid(start, goal) <= remaining_cost + 1e-9
+
 
 def test_cost_matrix_is_directed_and_marks_unreachable_legs() -> None:
     terrain = np.zeros((3, 3), dtype=float)

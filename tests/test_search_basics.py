@@ -1,4 +1,4 @@
-"""Search checks for basic algorithms"""
+"""Search checks."""
 
 import math
 

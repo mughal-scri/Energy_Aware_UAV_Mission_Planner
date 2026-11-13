@@ -25,8 +25,6 @@ pip install -r requirements.txt
 pytest -q
 ```
 
-
-
 ```bash
 python -c "from uavplanner.viz import write_figures_2; write_figures_2('results')"
 ```
@@ -37,8 +35,16 @@ Generate the ordering figures:
 python -c "from uavplanner.viz import write_figures_3; write_figures_3('results')"
 ```
 
+Generate the assignment figures:
+
+```bash
+python -c "from uavplanner.viz import write_figures_4; write_figures_4('results')"
+```
+
+Generate the simulation summary figures:
+
+```bash
+python -c "from uavplanner.viz import write_figures_5; write_figures_5('results')"
+```
+
 A one-command scenario runner will land later (`python -m uavplanner.cli`).
-
-## Docs
-
-Product and design docs live in `DOCS/` (PRD, Design_Doc, Roadmap, RULES).

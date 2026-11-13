@@ -73,6 +73,8 @@ class Interceptor:
     wp_index: int = 0
     mode: str = "PATROL"
     last_seen: Cell | None = None
+    target_last_seen: Cell | None = None
+    lost_ticks: int = 0
 
 
 @dataclass

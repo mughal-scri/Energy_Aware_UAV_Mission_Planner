@@ -38,7 +38,12 @@ def test_config_defaults_match() -> None:
     assert cfg.interceptor_detection == 6
     assert cfg.interceptor_speed == 1
     assert cfg.interceptor_capture == 1
+    assert cfg.interceptor_lost_ticks == 3
     assert cfg.hc_restarts == 20
+    assert cfg.csp_samples == 1000
+    assert cfg.csp_energy_scale == 1.0
+    assert cfg.csp_scale_shrink == 0.9
+    assert cfg.csp_verify_retries == 3
     assert (cfg.ga_pop, cfg.ga_gens, cfg.ga_pc, cfg.ga_pm) == (50, 100, 0.8, 0.1)
     assert (cfg.ga_tournament, cfg.ga_elite, cfg.ga_battery_penalty) == (3, 2, 1000.0)
     assert (cfg.minimax_depth, cfg.minimax_window_r) == (4, 4)
@@ -48,6 +53,7 @@ def test_config_defaults_match() -> None:
         1.5,
         5,
     )
+    assert cfg.minimax_terminal_value == 1000.0
     assert cfg.sensor_range == 3
     assert cfg.sensor_probs == {0: 0.9, 1: 0.7, 2: 0.5, 3: 0.3}
     assert cfg.sensor_max_looks == 3
@@ -73,4 +79,6 @@ def test_target_and_interceptor_defaults() -> None:
     assert target.status == "pending"
     assert threat.mode == "PATROL"
     assert threat.last_seen is None
+    assert threat.target_last_seen is None
+    assert threat.lost_ticks == 0
     assert threat.wp_index == 0

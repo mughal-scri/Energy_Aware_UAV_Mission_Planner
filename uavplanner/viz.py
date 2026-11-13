@@ -1,4 +1,4 @@
-"""Plots ---- Colours and sizes live in ``STYLE``; do not hard-code them."""
+"""Plots. Colours and sizes live in ``STYLE``; do not hard-code them."""
 
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ STYLE = {
     "figsize_search": (10.5, 9.2),
     "figsize_compare": (10.0, 4.8),
     "figsize_ordering": (10.5, 5.0),
+    "figsize_csp": (11.2, 5.4),
+    "figsize_minimax": (8.2, 4.8),
     "dpi": 130,
     "font_size": 11,
     "title_size": 12,
@@ -62,6 +64,9 @@ STYLE = {
     "ga_color": "#cc79a7",
     "base_route_color": "#0072b2",
     "route_linewidth": 1.6,
+    "drone_colors": ["#0072b2", "#009e73", "#d55e00"],
+    "drone_markers": ["o", "s", "D"],
+    "unassigned_color": "#7f7f7f",
 }
 
 
@@ -357,7 +362,7 @@ def fig_search_explored(
 
 
 def write_figures_1(out_dir: str | Path = "results") -> tuple[Path, Path]:
-    """Build a default scenario and write the two figures."""
+    """Build a default scenario and write the two initial figures."""
     from numpy.random import default_rng
 
     from uavplanner.config import Config
@@ -698,3 +703,317 @@ def write_figures_3(out_dir: str | Path = "results") -> tuple[Path, Path, Path]:
     fig_convergence(hc_history, ga_history, convergence_path)
     fig_ordering_scaling(rows, scaling_path)
     return tour_path, convergence_path, scaling_path
+
+
+def fig_csp_assignment(
+    world: World,
+    targets: list[Target],
+    assignment: dict[int, int],
+    plain_backtracks: int,
+    heuristic_backtracks: int,
+    path: str | Path,
+) -> None:
+    """Draw targets coloured by assigned drone beside a backtrack comparison."""
+    _apply_style()
+    n = int(world.terrain.shape[0])
+    fig, axes = plt.subplots(1, 2, figsize=STYLE["figsize_csp"], gridspec_kw={"width_ratios": [1.35, 1]})
+    ax, bars = axes
+    image = ax.imshow(
+        world.terrain,
+        origin="upper",
+        cmap=STYLE["cmap_terrain"],
+        interpolation="nearest",
+    )
+    ax.contour(
+        world.terrain,
+        levels=STYLE["contour_levels"],
+        colors=STYLE["contour_color"],
+        linewidths=STYLE["contour_width"],
+        origin="upper",
+    )
+    for cr, cc, radius in world.nofly_circles:
+        ax.add_patch(
+            Circle(
+                (cc, cr),
+                radius,
+                facecolor=STYLE["nofly_face"],
+                edgecolor=STYLE["nofly_edge"],
+                alpha=STYLE["nofly_alpha"],
+                linewidth=STYLE["nofly_linewidth"],
+                linestyle="--",
+            )
+        )
+    ax.scatter(
+        [world.base[1]],
+        [world.base[0]],
+        c=STYLE["base_color"],
+        marker=STYLE["base_marker"],
+        s=STYLE["base_size"],
+        edgecolors=STYLE["marker_edge"],
+        zorder=5,
+        label="Base",
+    )
+    drone_ids = sorted({drone_id for drone_id in assignment.values()})
+    legend_handles: list[Line2D] = [
+        Line2D(
+            [0],
+            [0],
+            color=STYLE["base_color"],
+            marker=STYLE["base_marker"],
+            linestyle="None",
+            markeredgecolor=STYLE["marker_edge"],
+            label="Base",
+        )
+    ]
+    for drone_id in drone_ids:
+        color = STYLE["drone_colors"][(drone_id - 1) % len(STYLE["drone_colors"])]
+        marker = STYLE["drone_markers"][(drone_id - 1) % len(STYLE["drone_markers"])]
+        chosen = [target for target in targets if assignment.get(target.id) == drone_id]
+        ax.scatter(
+            [target.pos[1] for target in chosen],
+            [target.pos[0] for target in chosen],
+            c=color,
+            marker=marker,
+            s=STYLE["target_size"],
+            edgecolors=STYLE["marker_edge"],
+            zorder=6,
+            label=f"Drone {drone_id}",
+        )
+        legend_handles.append(
+            Line2D(
+                [0],
+                [0],
+                color=color,
+                marker=marker,
+                linestyle="None",
+                markeredgecolor=STYLE["marker_edge"],
+                label=f"Drone {drone_id}",
+            )
+        )
+    unassigned = [target for target in targets if target.id not in assignment]
+    if unassigned:
+        ax.scatter(
+            [target.pos[1] for target in unassigned],
+            [target.pos[0] for target in unassigned],
+            c=STYLE["unassigned_color"],
+            marker=STYLE["target_marker"],
+            s=STYLE["target_size"],
+            edgecolors=STYLE["marker_edge"],
+            zorder=6,
+        )
+        legend_handles.append(
+            Line2D(
+                [0],
+                [0],
+                color=STYLE["unassigned_color"],
+                marker=STYLE["target_marker"],
+                linestyle="None",
+                markeredgecolor=STYLE["marker_edge"],
+                label="Unassigned",
+            )
+        )
+    ax.set_title("Targets coloured by assigned drone", pad=STYLE["title_pad"])
+    ax.set_xlabel("column")
+    ax.set_ylabel("row")
+    ax.set_xlim(-0.5, n - 0.5)
+    ax.set_ylim(n - 0.5, -0.5)
+    ax.legend(handles=legend_handles, loc="upper right", fontsize=STYLE["legend_fontsize"], framealpha=0.92)
+    colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+    colorbar.set_label("height (m)")
+
+    labels = ["Plain\nbacktracking", "MRV +\nforward checking"]
+    counts = [plain_backtracks, heuristic_backtracks]
+    bar_colors = [STYLE["random_color"], STYLE["hc_color"]]
+    positions = np.arange(len(labels))
+    drawn = bars.bar(
+        positions,
+        counts,
+        color=bar_colors,
+        edgecolor=STYLE["bar_edge"],
+        width=0.62,
+    )
+    bars.bar_label(drawn, padding=3)
+    bars.set_xticks(positions, labels)
+    bars.set_ylabel("backtracks")
+    bars.set_title("Assignment search effort", pad=STYLE["title_pad"])
+    bars.set_ylim(0, max(counts + [1]) * 1.25)
+    bars.grid(axis="y", alpha=0.25)
+    bars.set_axisbelow(True)
+    fig.tight_layout()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=STYLE["dpi"], bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_figures_4(out_dir: str | Path = "results") -> Path:
+    """Generate the seeded CSP assignment figure and backtrack comparison."""
+    from uavplanner.csp import avg_cell_cost, csp_assign, estimate_target_cost
+    from uavplanner.models import Drone, EnergyCoef, Target
+    from uavplanner.world import make_targets, make_world
+
+    cfg = Config()
+    rng = np.random.default_rng(cfg.seed)
+    world = make_world(cfg, rng)
+    targets = make_targets(world, cfg, rng)
+    drones = [
+        Drone(id=drone_id, battery=cfg.battery, capacity_kg=cfg.capacity_kg, pos=world.base)
+        for drone_id in range(1, cfg.n_drones + 1)
+    ]
+    average = avg_cell_cost(world, EnergyCoef(), rng, samples=cfg.csp_samples)
+    assignment = None
+    # Keep the seeded figure informative when the full random scenario is
+    # infeasible under the deliberately conservative per-target CSP estimate.
+    for count in range(len(targets), 0, -1):
+        selected = targets[:count]
+        estimates = {
+            target.id: estimate_target_cost(world.base, target, average)
+            for target in selected
+        }
+        candidate, heuristic_stats = csp_assign(
+            selected,
+            drones,
+            estimates,
+            reserve=cfg.reserve,
+            use_mrv=True,
+            use_fc=True,
+        )
+        if candidate is not None:
+            assignment = candidate
+            break
+    # A compact constrained example makes the MRV/forward-checking contrast
+    # visible even when the seeded map's feasible subset needs no backtracking.
+    effort_targets = [
+        Target(id=1, pos=(1, 1), mass_kg=1.0),
+        Target(id=2, pos=(2, 2), mass_kg=3.0),
+    ]
+    effort_drones = [
+        Drone(id=1, battery=100.0, capacity_kg=3.0),
+        Drone(id=2, battery=100.0, capacity_kg=1.0),
+    ]
+    effort_costs = {1: 1.0, 2: 1.0}
+    _plain, plain_stats = csp_assign(
+        effort_targets, effort_drones, effort_costs, use_mrv=False, use_fc=False
+    )
+    _smart, heuristic_stats = csp_assign(
+        effort_targets, effort_drones, effort_costs, use_mrv=True, use_fc=True
+    )
+    path = Path(out_dir) / "fig_csp_assignment.png"
+    fig_csp_assignment(
+        world,
+        targets,
+        {} if assignment is None else assignment,
+        plain_stats["backtracks"],
+        heuristic_stats["backtracks"],
+        path,
+    )
+    return path
+
+
+def fig_minimax_nodes(plain_nodes: int, alpha_beta_nodes: int, path: str | Path) -> None:
+    """Compare total visited nodes with Minimax and Alpha-Beta pruning."""
+    _apply_style()
+    fig, ax = plt.subplots(figsize=STYLE["figsize_minimax"])
+    labels = ["Minimax", "Alpha-Beta"]
+    values = [plain_nodes, alpha_beta_nodes]
+    bars = ax.bar(
+        labels,
+        values,
+        color=[STYLE["random_color"], STYLE["hc_color"]],
+        edgecolor=STYLE["bar_edge"],
+        width=0.62,
+    )
+    ax.bar_label(bars, padding=3)
+    ax.set_ylabel("nodes visited across seeded positions")
+    ax.set_title("Alpha-Beta reduces search work", pad=STYLE["title_pad"])
+    ax.set_ylim(0, max(values + [1]) * 1.18)
+    ax.grid(axis="y", alpha=0.25)
+    ax.set_axisbelow(True)
+    fig.tight_layout()
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(path, dpi=STYLE["dpi"], bbox_inches="tight")
+    plt.close(fig)
+
+
+def write_figures_5(out_dir: str | Path = "results") -> tuple[Path, Path, Path]:
+    """Run a seeded three-drone mission and regenerate summary figures."""
+    from uavplanner.adversarial import choose_move
+    from uavplanner.console import Console
+    from uavplanner.models import Drone, Target, World
+    from uavplanner.planner import Plan
+    from uavplanner.simulator import run_mission
+
+    cfg = Config(grid_n=11, max_ticks=80, takeoff_stagger=2, noise_sd=0.0)
+    world = World(
+        terrain=np.zeros((cfg.grid_n, cfg.grid_n)),
+        no_fly=np.zeros((cfg.grid_n, cfg.grid_n), dtype=bool),
+        wind=(0.0, 0.0),
+        base=(5, 5),
+    )
+    targets = [
+        Target(id=1, pos=(2, 5), mass_kg=0.5),
+        Target(id=2, pos=(5, 8), mass_kg=0.5),
+        Target(id=3, pos=(8, 5), mass_kg=0.5),
+    ]
+    drones = [
+        Drone(id=drone_id, battery=cfg.battery, capacity_kg=cfg.capacity_kg, pos=world.base)
+        for drone_id in range(1, 4)
+    ]
+    routes = {
+        1: [(5, 5), (4, 5), (3, 5), (2, 5), (3, 5), (4, 5), (5, 5)],
+        2: [(5, 5), (5, 6), (5, 7), (5, 8), (5, 7), (5, 6), (5, 5)],
+        3: [(5, 5), (6, 5), (7, 5), (8, 5), (7, 5), (6, 5), (5, 5)],
+    }
+    plan = Plan(
+        verdict="GO",
+        reasons=[],
+        rejected={},
+        assignment={1: 1, 2: 2, 3: 3},
+        order={1: [1], 2: [2], 3: [3]},
+        routes=routes,
+        est_energy={1: 8.0, 2: 8.0, 3: 8.0},
+    )
+    console = Console()
+    summary = run_mission(
+        world, plan, drones, None, targets, cfg.true_coef, cfg.true_coef, cfg,
+        np.random.default_rng(cfg.seed), console, [],
+    )
+    if (
+        summary["collisions"] != 0
+        or summary["missions_completed"] != len(drones)
+        or summary["targets_confirmed"] != len(targets)
+    ):
+        raise RuntimeError("Figure mission did not complete cleanly")
+
+    battery_path = Path(out_dir) / "fig_battery.png"
+    timeline_path = Path(out_dir) / "fig_timeline.png"
+    _apply_style()
+    for output, plotter in (
+        (battery_path, console.plot_battery),
+        (timeline_path, console.plot_timeline),
+    ):
+        fig, ax = plt.subplots(figsize=STYLE["figsize_compare"])
+        plotter(ax)
+        fig.tight_layout()
+        output.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output, dpi=STYLE["dpi"], bbox_inches="tight")
+        plt.close(fig)
+
+    rng = np.random.default_rng(cfg.seed)
+    plain_total = 0
+    pruned_total = 0
+    mask = np.zeros((9, 9), dtype=bool)
+    minimax_cfg = Config()
+    for _ in range(20):
+        drone, interceptor, waypoint = [
+            tuple(int(value) for value in rng.integers(0, 9, size=2))
+            for _ in range(3)
+        ]
+        plain_total += choose_move(
+            drone, interceptor, waypoint, mask, cfg=minimax_cfg, use_alpha_beta=False
+        )[2]
+        pruned_total += choose_move(
+            drone, interceptor, waypoint, mask, cfg=minimax_cfg, use_alpha_beta=True
+        )[2]
+    minimax_path = Path(out_dir) / "fig_minimax_nodes.png"
+    fig_minimax_nodes(plain_total, pruned_total, minimax_path)
+    return battery_path, timeline_path, minimax_path

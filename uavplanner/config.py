@@ -1,8 +1,8 @@
 """All tunable parameters in one dataclass.
 
 Later modules must read values from ``Config`` instead of hard-coding them.
-Defaults match (and the world-generation ranges in
-Section 6.1, so ``world.py`` will not introduce magic numbers).
+Defaults match the specification (and the world-generation ranges,
+so ``world.py`` will not introduce magic numbers).
 """
 
 from __future__ import annotations
@@ -55,7 +55,12 @@ class Config:
     interceptor_detection: int = 6
     interceptor_speed: int = 1
     interceptor_capture: int = 1
+    interceptor_lost_ticks: int = 3
     hc_restarts: int = 20
+    csp_samples: int = 1000
+    csp_energy_scale: float = 1.0
+    csp_scale_shrink: float = 0.9
+    csp_verify_retries: int = 3
     ga_pop: int = 50
     ga_gens: int = 100
     ga_pc: float = 0.8
@@ -70,6 +75,7 @@ class Config:
     minimax_w_goal: float = 1.0
     minimax_w_threat: float = 1.5
     minimax_cap: int = 5
+    minimax_terminal_value: float = 1000.0
     sensor_range: int = 3
     sensor_probs: dict[int, float] = field(default_factory=_sensor_probs)
     sensor_max_looks: int = 3
